@@ -81,12 +81,12 @@
 
 #ifdef PROF
 #define ENTRY(x) \
-        .align 4; .globl SYM(x); .proc 1; SYM(x):; .data; .align 4; 1: .long 0; \
+        .align 4; .globl SYM(x); SYM(x):; .data; .align 4; 1: .long 0; \
         .text; save %sp,-96,%sp; sethi %hi(1b),%o0; call mcount; \
         or %lo(1b),%o0,%o0; restore
 #else
 #define ENTRY(x) \
-        .align 4; .globl SYM(x); .proc 1; SYM(x):
+        .align 4; .globl SYM(x);  SYM(x):
 #endif
 
 
@@ -114,6 +114,21 @@
 
 ENTRY(setjmp)
 ENTRY(_setjmp)
+#ifdef _FLAT
+        /*
+         * Single register window model (GCC -mflat): store call-saved
+         * registers at their reserved stack locations.
+         */
+        std     %l0, [%sp]
+        std     %l2, [%sp+8]
+        std     %l4, [%sp+16]
+        std     %l6, [%sp+24]
+
+        std     %i0, [%sp+32]
+        std     %i2, [%sp+40]
+        std     %i4, [%sp+48]
+#endif
+
         st      %sp, [%o0]      /* caller's stack pointer */
         st      %i7, [%o0+4]    /* caller's return pc */
         st      %fp, [%o0+8]    /* store caller's frame pointer */
@@ -123,7 +138,9 @@ ENTRY(_setjmp)
 
 ENTRY(longjmp)
 ENTRY(_longjmp)
+#ifndef _FLAT
         ta      0x03            /* flush registers */
+#endif
         addcc   %o1, %g0, %g1   ! compute v ? v : 1 in a global register
         be,a    0f
         mov     1, %g1
